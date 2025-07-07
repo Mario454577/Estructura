@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "rutas-bolivar"
+version = "0.1.0"
+description = "Sistema de rutas para el departamento de Bolívar"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+flask = "^3.1.1"
+flask-cors = "^6.0.1"
+pandas = "^2.3.0"
+folium = "^0.8.1"
+numpy = "^2.3.1"
+networkx = "^3.5"
+
+[tool.pyright]
+include = ["*.py"]
+exclude = ["**/node_modules", "**/__pycache__"]
+typeCheckingMode = "basic"
+useLibraryCodeForTypes = true
+reportMissingImports = true
+reportMissingModuleSource = true 

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargar Archivo - Rutas Bolívar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover {
+            border-color: #007bff;
+            background-color: #e9ecef;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title text-center mb-4">Cargar Archivo CSV</h3>
+                        
+                        <div class="upload-zone" id="dropZone">
+                            <p class="mb-2">Arrastra y suelta tu archivo CSV aquí</p>
+                            <p class="text-muted mb-2">o</p>
+                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                Seleccionar Archivo
+                            </button>
+                            <input type="file" id="fileInput" accept=".csv" style="display: none;">
+                        </div>
+                        
+                        <div class="mt-3">
+                            <p class="text-muted small">
+                                Formato requerido: CSV con columnas "Origen;Destino;Distancia;Duracion"
+                            </p>
+                        </div>
+                        
+                        <div id="errorMessage" class="error-message text-center"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurar la zona de carga de archivos
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // Prevenir comportamiento por defecto
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        // Resaltar la zona al arrastrar
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+        
+        // Manejar la carga del archivo
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFiles, false);
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function highlight(e) {
+            dropZone.classList.add('bg-light');
+        }
+        
+        function unhighlight(e) {
+            dropZone.classList.remove('bg-light');
+        }
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+        
+        function handleFiles(e) {
+            const files = e.target.files || e;
+            const file = files[0];
+            
+            if (file) {
+                uploadFile(file);
+            }
+        }
+        
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Redirigir a la página principal
+                    window.location.replace('/');
+                } else {
+                    errorMessage.textContent = data.message;
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Error al cargar el archivo';
+                errorMessage.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,20 @@
+{
+    "include": [
+        "*.py"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__"
+    ],
+    "ignore": [],
+    "defineConstant": {
+        "DEBUG": true
+    },
+    "venvPath": "./venv",
+    "pythonVersion": "3.8",
+    "pythonPlatform": "Windows",
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "reportMissingImports": "warning",
+    "reportMissingModuleSource": "warning"
+} 

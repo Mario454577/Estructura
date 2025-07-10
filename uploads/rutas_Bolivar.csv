@@ -2,37 +2,95 @@ Origen;Destino;Distancia;Duracion
 Zambrano;Calamar;103;117
 Clemencia;San Jacinto;150;156
 Talaigua Nuevo;Turbana;237;256
-Altos Del Rosario;Villanueva;525;668
+Altos del Rosario;Villanueva;525;668
 Rio Viejo;San Cristobal;473;562
-San Juan Nemopuceno;Cordoba;84;122
+San Juan Nepomuceno;Cordoba;84;122
 Achi;Magangue;226;273
 El Penon;Maria La Baja;468;601
 Cantagallo;San Pablo;12;15
 Arjona;Norosi;422;492
 Cicuco;Tiquisio;307;399
-El Guamo;Hatillo De Loba;277;309
+El Guamo;Hatillo de Loba;277;309
 Regidor;Santa Catalina;520;599
 Turbaco;San Estanislao;7;62
-Arenal;El Carmen De Bol var;73;111
-Soplaviento;Santa Cruz De Mompox;271;292
+Arenal;El Carmen de Bolivar;73;111
+Soplaviento;Santa Cruz de Mompox;271;292
 Montecristo;Mahates;368;413
 Arroyohondo;Margarita;293;320
-Cartagena De Indias;Santa Rosa;16;28
+Cartagena de Indias;Santa Rosa;16;28
 Calamar;Clemencia;92;111
-San Jacinto;Talaiga Nuevo;150;165
+San Jacinto;Talaigua Nuevo;150;165
 Turbana;Altos del Rosario;494;630
 Villanueva;Rio Viejo;484;583
-San Cristobal;San Juan Nemopuceno;76;100
+San Cristobal;San Juan Nepomuceno;76;100
 Cordoba;Achi;273;301
 Magangue;El Penon;393;564
-Arjona;Maria la Baja;43;54
+Arjona;Maria La Baja;43;54
 San Pablo;Cantagallo;12;15
 Norosi;Cicuco;338;450
 Tiquisio;El Guamo;359;415
-Hatillo De Loba;Regidor;476;631
+Hatillo de Loba;Regidor;476;631
 Santa Catalina;Turbaco;43;50
 San Estanislao;Arenal;468;564
-El Carmen De Bolivar;Soplaviento;110;124
-Santa Cruz De Mompox;Montecristo;324;423
+El Carmen de Bolivar;Soplaviento;110;124
+Santa Cruz de Mompox;Montecristo;324;423
 Mahates;Arroyohondo;21;27
-Margarita;Cartagena De Indias;326;395
+Margarita;Cartagena de Indias;326;395
+Cartagena de Indias;Turbana;21;30
+Cartagena de Indias;Turbaco;11;21
+Cartagena de Indias;Santa Rosa;16;25
+Cartagena de Indias;Clemencia;30;37
+Santa Rosa;Clemencia;25;30
+Santa Rosa;Villanueva;12;19
+Clemencia;Santa Catalina;5.9;7
+Clemencia;Villanueva;20;50
+Santa Catalina;San Estanislao;56;67
+Turbaco;Turbana;11;20
+Turbaco;Arjona;13;16
+Turbaco;Villanueva;25;41
+Villanueva;San Estanislao;17;23
+Turbana;Maria La Baja;59;64
+Turbana;Arjona;24;29
+Arjona;Maria La Baja;44;52
+Arjona;Mahates;36;41
+Arjona;San Estanislao;32;52
+San Estanislao;Soplaviento;1.5;4
+Soplaviento;San Cristobal;12;17
+Soplaviento;Mahates;21;25
+Soplaviento;Arroyohondo;30;46
+Mahates;Maria La Baja;38;45
+Mahates;Arroyohondo;22;27
+Arroyohondo;Calamar;16;18
+Calamar;El Guamo;31;56
+Calamar;San Juan Nepomuceno;43;41
+El Guamo;San Juan Nepomuceno;20;30
+San Juan Nepomuceno;Maria La Baja;62;71
+San Juan Nepomuceno;San Jacinto;15;18
+Maria La Baja;El Carmen de Bolivar;55;57
+San Jacinto;El Carmen de Bolivar;14;19
+El Carmen de Bolivar;Zambrano;40;59
+El Carmen de Bolivar;Cordoba;52;73
+El Carmen de Bolivar;Magangue;105;112
+Zambrano;Cordoba;48;72
+Cordoba;Magangue;65;101
+Magangue;Cicuco;22;26
+Magangue;Achi;234;282
+Cicuco;Talaigua Nuevo;9;13
+Talaigua Nuevo;Santa Cruz de Mompox;26;36
+Santa Cruz de Mompox;San Fernando;12;15
+San Fernando;Margarita;22;26
+Margarita;Hatillo de Loba;46;59
+Barranco de Loba;San Martin de Loba;9;16
+Barranco de Loba;Altos del Rosario;27;54
+El Penon;Regidor;47;96
+Regidor;Rio Viejo;12;16
+Rio Viejo;Tiquisio;57;99
+Rio Viejo;Arenal;28;49
+Altos del Rosario;Tiquisio;88;184
+Tiquisio;Achi;48;99
+Tiquisio;Norosi;50;92
+Tiquisio;Montecristo;71;131
+Montecristo;Arenal;118;208
+Santa Rosa del Sur;Simiti;18;28
+Simiti;San Pablo;77;100
+San Pablo;Cantagallo;12;15

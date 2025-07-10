@@ -3,7 +3,7 @@ from flask_cors import CORS
 import pandas as pd
 import folium
 import json
-from route_algorithms import RouteCalculator
+from route_algorithms import RouteCalculator, Graph
 from pathlib import Path
 import os
 from werkzeug.utils import secure_filename
@@ -12,12 +12,12 @@ from flask.typing import ResponseReturnValue
 import csv
 
 app = Flask(__name__)
-app.secret_key = 'tu_clave_secreta_aqui'  # Necesario para flash messages y session
+app.secret_key = '1111' 
 CORS(app)
 
-# Cargar datos de coordenadas
+# Coordenadas de los municipios
 COORDS_DATA = {
-    "Achí": {"lat": 8.60283045, "lon": -74.4586880450204},
+    "Achi": {"lat": 8.60283045, "lon": -74.4586880450204},
     "Altos del Rosario": {"lat": 8.79139, "lon": -74.1636},
     "Arenal": {"lat": 8.4593893, "lon": -73.942994},
     "Arjona": {"lat": 10.25444, "lon": -75.34389},
@@ -28,39 +28,39 @@ COORDS_DATA = {
     "Cartagena de Indias": {"lat": 10.39972, "lon": -75.51444},
     "Cicuco": {"lat": 9.2778539, "lon": -74.643809},
     "Clemencia": {"lat": 10.56180475, "lon": -75.3295539371322},
-    "Córdoba": {"lat": 9.5244165, "lon": -74.8780482},
-    "El Carmen de Bolívar": {"lat": 9.7178841, "lon": -75.1241376},
+    "Cordoba": {"lat": 9.5244165, "lon": -74.8780482},
+    "El Carmen de Bolivar": {"lat": 9.7178841, "lon": -75.1241376},
     "El Guamo": {"lat": 10.0312607, "lon": -74.9754413},
-    "El Peñón": {"lat": 8.9895346, "lon": -73.949864},
+    "El Penon": {"lat": 8.9895346, "lon": -73.949864},
     "Hatillo de Loba": {"lat": 8.9568235, "lon": -74.0770262},
-    "Magangué": {"lat": 9.2412097, "lon": -74.7567413},
+    "Magangue": {"lat": 9.2412097, "lon": -74.7567413},
     "Mahates": {"lat": 10.234262, "lon": -75.186894},
     "Margarita": {"lat": 9.05747505, "lon": -74.2209201246511},
-    "María La Baja": {"lat": 9.9863081, "lon": -75.3963004},
+    "Maria La Baja": {"lat": 9.9863081, "lon": -75.3963004},
     "Montecristo": {"lat": 7.93057835, "lon": -74.4074396536722},
     "Morales": {"lat": 8.2763913, "lon": -73.8680272},
-    "Norosí": {"lat": 8.52611, "lon": -74.0378},
+    "Norosi": {"lat": 8.52611, "lon": -74.0378},
     "Pinillos": {"lat": 8.915, "lon": -74.4619},
     "Regidor": {"lat": 8.66639, "lon": -73.8222},
-    "Río Viejo": {"lat": 8.583, "lon": -73.85},
-    "San Cristóbal": {"lat": 10.3925, "lon": -75.0631},
+    "Rio Viejo": {"lat": 8.583, "lon": -73.85},
+    "San Cristobal": {"lat": 10.3925, "lon": -75.0631},
     "San Estanislao": {"lat": 10.3978, "lon": -75.1514},
     "San Fernando": {"lat": 9.21194, "lon": -74.3231},
     "San Jacinto": {"lat": 9.83111, "lon": -75.1219},
     "San Jacinto del Cauca": {"lat": 8.24972, "lon": -74.72},
     "San Juan Nepomuceno": {"lat": 9.95222, "lon": -75.0811},
-    "San Martín de Loba": {"lat": 8.93889, "lon": -74.0392},
+    "San Martin de Loba": {"lat": 8.93889, "lon": -74.0392},
     "San Pablo": {"lat": 7.47639, "lon": -73.9231},
     "Santa Catalina": {"lat": 10.6039, "lon": -75.2878},
     "Santa Cruz de Mompox": {"lat": 9.233, "lon": -74.417},
     "Santa Rosa": {"lat": 10.4456, "lon": -75.3686},
     "Santa Rosa del Sur": {"lat": 7.96333, "lon": -74.0533},
-    "Simití": {"lat": 7.95639, "lon": -73.9461},
+    "Simiti": {"lat": 7.95639, "lon": -73.9461},
     "Soplaviento": {"lat": 10.3908, "lon": -75.1367},
     "Talaigua Nuevo": {"lat": 9.30278, "lon": -74.5678},
     "Tiquisio": {"lat": 8.55778, "lon": -74.2639},
     "Turbaco": {"lat": 10.3319, "lon": -75.4142},
-    "Turbaná": {"lat": 10.283, "lon": -75.45},
+    "Turbana": {"lat": 10.283, "lon": -75.45},
     "Villanueva": {"lat": 10.4442, "lon": -75.2747},
     "Zambrano": {"lat": 9.74472, "lon": -74.8172}
 }
@@ -79,27 +79,27 @@ def allowed_file(filename: str) -> bool:
 
 def load_graph_data(file_path: str) -> bool:
     """Carga los datos del grafo desde un archivo CSV."""
-    global CALCULATOR  # Declarar que vamos a modificar la variable global
+    global CALCULATOR  
     try:
-        # Leer el archivo CSV y construir el grafo
-        graph_data: Dict[str, Dict[str, Dict[str, float]]] = {}
+    
+        graph = Graph()
         
         with open(file_path, 'r', encoding='utf-8') as file:
             reader = csv.reader(file, delimiter=';')
             headers = next(reader)
             
-            # Verificar encabezados
+      
             required_headers = ['Origen', 'Destino', 'Distancia', 'Duracion']
             if not all(header in headers for header in required_headers):
                 return False
             
-            # Obtener índices de las columnas
+           
             origin_idx = headers.index('Origen')
             dest_idx = headers.index('Destino')
             dist_idx = headers.index('Distancia')
             time_idx = headers.index('Duracion')
             
-            # Leer datos
+           
             for row in reader:
                 origin = row[origin_idx].strip()
                 destination = row[dest_idx].strip()
@@ -109,26 +109,12 @@ def load_graph_data(file_path: str) -> bool:
                 except ValueError:
                     continue
                 
-                # Agregar al grafo (ambas direcciones)
-                if origin not in graph_data:
-                    graph_data[origin] = {}
-                if destination not in graph_data:
-                    graph_data[destination] = {}
-                
-                # Agregar arista origen -> destino
-                graph_data[origin][destination] = {
-                    'distancia': distance,
-                    'tiempo': duration
-                }
-                
-                # Agregar arista destino -> origen (grafo no dirigido)
-                graph_data[destination][origin] = {
-                    'distancia': distance,
-                    'tiempo': duration
-                }
+            
+                graph.add_edge(origin, destination, distance, duration)
+                graph.add_edge(destination, origin, distance, duration)
         
-        # Crear nueva instancia del calculador
-        CALCULATOR = RouteCalculator(graph_data)
+
+        CALCULATOR = RouteCalculator(graph)
         return True
         
     except Exception as e:
@@ -138,7 +124,7 @@ def load_graph_data(file_path: str) -> bool:
 def create_base_map():
     """Crear mapa base centrado en Bolívar"""
     return folium.Map(
-        location=[9.0, -74.8],  # Centro aproximado de Bolívar
+        location=[9.0, -74.8],  
         zoom_start=8,
         tiles='OpenStreetMap'
     )
@@ -147,13 +133,18 @@ def create_base_map():
 def index():
     """Ruta principal que maneja la redirección entre la página de carga y la interfaz principal."""
     if 'graph_loaded' not in session or not session['graph_loaded']:
-        return render_template('upload.html')
+        return redirect(url_for('upload_page'))
     return render_template('index.html')
+
+@app.route('/upload')
+def upload_page():
+    """Página de carga de archivos."""
+    return render_template('upload.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file() -> ResponseReturnValue:
     """Maneja la carga de archivos CSV."""
-    # Verificar si hay un archivo en la solicitud
+
     if 'file' not in request.files:
         return jsonify({
             'status': 'error',
@@ -162,14 +153,14 @@ def upload_file() -> ResponseReturnValue:
     
     file = request.files['file']
     
-    # Verificar si se seleccionó un archivo
+
     if not file or not file.filename:
         return jsonify({
             'status': 'error',
             'message': 'No se seleccionó ningún archivo'
         })
     
-    # Verificar si es un archivo CSV
+
     if not allowed_file(str(file.filename)):
         return jsonify({
             'status': 'error',
@@ -177,12 +168,10 @@ def upload_file() -> ResponseReturnValue:
         })
     
     try:
-        # Guardar el archivo
+  
         filename = secure_filename(str(file.filename))
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        
-        # Intentar cargar el grafo
         if load_graph_data(file_path):
             session['graph_loaded'] = True
             session['graph_file'] = file_path
@@ -192,7 +181,7 @@ def upload_file() -> ResponseReturnValue:
                 'message': 'Archivo cargado exitosamente'
             })
         else:
-            # Si falla la carga del grafo, eliminar el archivo
+           
             if os.path.exists(file_path):
                 os.remove(file_path)
                 
@@ -202,7 +191,7 @@ def upload_file() -> ResponseReturnValue:
             })
             
     except Exception as e:
-        # En caso de cualquier error, asegurar que se elimine el archivo si existe
+       
         if 'file_path' in locals() and os.path.exists(file_path):
             os.remove(file_path)
             
@@ -220,238 +209,183 @@ def get_municipalities():
 
 @app.route('/calculate_route', methods=['POST'])
 def calculate_route() -> ResponseReturnValue:
-    """Calcula y visualiza la ruta entre dos municipios."""
-    if 'graph_loaded' not in session:
-        return jsonify({
-            'status': 'error',
-            'message': 'Primero debe cargar un archivo CSV'
-        })
+    """Calcula la ruta entre dos puntos usando el algoritmo especificado."""
+    print("Iniciando cálculo de ruta...")  # Debug log
     
     if not CALCULATOR:
+        print("Error: No hay calculadora inicializada")  # Debug log
         return jsonify({
             'status': 'error',
-            'message': 'El calculador de rutas no está inicializado'
-        })
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            'status': 'error',
-            'message': 'Datos inválidos'
-        })
-        
-    origin = str(data.get('origin', ''))
-    destination = str(data.get('destination', ''))
-    algorithm = str(data.get('algorithm', ''))
-    criterion = str(data.get('criterion', 'distancia'))
-    
-    if not all([origin, destination, algorithm]):
-        return jsonify({
-            'status': 'error',
-            'message': 'Faltan datos requeridos'
-        })
-    
+            'message': 'No se han cargado los datos del grafo'
+        }), 400
+
     try:
-        if algorithm == 'edmonds_karp':
-            # Construir grafo de flujo y calcular flujo máximo
-            CALCULATOR.build_flow_graph(origin, destination)
-            flow_paths, max_flow = CALCULATOR.edmonds_karp(origin, destination)
+        print("Content-Type:", request.headers.get('Content-Type'))  # Debug log
+        print("Datos raw:", request.get_data())  # Debug log
+        
+        data = request.get_json(force=True)
+        print("Datos parseados:", data)  # Debug log
+        
+        if not data:
+            print("Error: No hay datos en la solicitud")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': 'No se recibieron datos en la solicitud'
+            }), 400
+
+        print(f"Datos recibidos: {data}")  # Debug log
+
+        origin = data.get('origin')
+        destination = data.get('destination')
+        algorithm = data.get('algorithm')
+        criterion = data.get('criterion', 'distancia')
+
+        print(f"Origen: {origin}, Destino: {destination}, Algoritmo: {algorithm}, Criterio: {criterion}")  # Debug log
+
+        # Validar datos requeridos
+        if not origin or not destination or not algorithm:
+            missing = []
+            if not origin: missing.append('origen')
+            if not destination: missing.append('destino')
+            if not algorithm: missing.append('algoritmo')
+            print(f"Error: Faltan datos requeridos: {missing}")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': f'Faltan datos requeridos: {", ".join(missing)}'
+            }), 400
+
+        # Validar que los municipios existan
+        if origin not in COORDS_DATA:
+            print(f"Error: Municipio de origen no encontrado: {origin}")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': f'Municipio de origen "{origin}" no encontrado'
+            }), 404
             
-            if not flow_paths:
+        if destination not in COORDS_DATA:
+            print(f"Error: Municipio de destino no encontrado: {destination}")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': f'Municipio de destino "{destination}" no encontrado'
+            }), 404
+
+        try:
+            # Validar algoritmo
+            valid_algorithms = ['dijkstra', 'bellman_ford', 'floyd_warshall', 'a_star', 'johnson',
+                              'ford_fulkerson', 'edmonds_karp', 'push_relabel']
+            if algorithm not in valid_algorithms:
+                print(f"Error: Algoritmo no válido: {algorithm}")  # Debug log
                 return jsonify({
                     'status': 'error',
-                    'message': 'No se encontró una ruta válida'
-                })
-            
-            # Crear mapa con las rutas de flujo
-            m = create_base_map()
-            
-            # Verificar y obtener coordenadas
-            try:
-                origin_coords = COORDS_DATA.get(origin, {})
-                dest_coords = COORDS_DATA.get(destination, {})
-                
-                # Convertir coordenadas a float y validar
-                origin_lat = float(origin_coords.get('lat', 0))
-                origin_lon = float(origin_coords.get('lon', 0))
-                dest_lat = float(dest_coords.get('lat', 0))
-                dest_lon = float(dest_coords.get('lon', 0))
-                
-                if origin_lat != 0 and origin_lon != 0 and dest_lat != 0 and dest_lon != 0:
-                    # Agregar marcadores para origen y destino
-                    folium.Marker(
-                        location=[origin_lat, origin_lon],
-                        popup=f'Origen: {origin}',
-                        icon=folium.Icon(color='green')
-                    ).add_to(m)
+                    'message': f'Algoritmo "{algorithm}" no válido'
+                }), 400
+
+            # Calcular la ruta según el algoritmo seleccionado
+            if algorithm in ['edmonds_karp', 'push_relabel', 'ford_fulkerson']:
+                print(f"Calculando flujo máximo con {algorithm}...")  # Debug log
+                try:
+                    if algorithm == 'ford_fulkerson':
+                        result = CALCULATOR._ford_fulkerson(origin, destination)
+                    elif algorithm == 'edmonds_karp':
+                        result = CALCULATOR._edmonds_karp(origin, destination)
+                    elif algorithm == 'push_relabel':
+                        result = CALCULATOR._push_relabel(origin, destination)
                     
-                    folium.Marker(
-                        location=[dest_lat, dest_lon],
-                        popup=f'Destino: {destination}',
-                        icon=folium.Icon(color='red')
-                    ).add_to(m)
-                    
-                    # Dibujar cada ruta de flujo con un color diferente
-                    colors = ['blue', 'purple', 'orange', 'darkred', 'darkgreen', 'cadetblue']
-                    flow_path_details = []
-                    
-                    for i, path_data in enumerate(flow_paths):
-                        if not isinstance(path_data, tuple) or len(path_data) != 2:
-                            continue
-                            
-                        path, flow = path_data
-                        if not isinstance(path, list) or not isinstance(flow, (int, float)):
-                            continue
-                            
-                        # Verificar y recolectar coordenadas para cada ciudad en la ruta
-                        points = []
-                        valid_path = True
+                    if result is None:
+                        print("Error: No se pudo calcular el flujo máximo")  # Debug log
+                        return jsonify({
+                            'status': 'error',
+                            'message': 'No se pudo calcular el flujo máximo'
+                        }), 500
                         
-                        for city in path:
-                            city_str = str(city)
-                            city_coords = COORDS_DATA.get(city_str, {})
-                            
-                            lat = float(city_coords.get('lat', 0))
-                            lon = float(city_coords.get('lon', 0))
-                            
-                            if lat != 0 and lon != 0:
-                                points.append([lat, lon])
-                            else:
-                                valid_path = False
-                                break
-                        
-                        if valid_path and points:
-                            color = colors[i % len(colors)]
-                            weight = 2.0 + float(flow)/50.0
-                            
-                            folium.PolyLine(
-                                locations=points,
-                                weight=weight,
-                                color=color,
-                                popup=f'Flujo: {flow}'
-                            ).add_to(m)
-                            
-                            flow_path_details.append({
-                                'path': [str(city) for city in path],
-                                'flow': float(flow)
-                            })
+                    max_flow, flow_paths = result
+                    
+                    # Preparar datos para el frontend
+                    route_data = {
+                        'type': 'flow',
+                        'paths': flow_paths,
+                        'coords': COORDS_DATA
+                    }
                     
                     return jsonify({
                         'status': 'success',
-                        'map': m._repr_html_(),
+                        'route_data': route_data,
                         'details': {
-                            'max_flow': float(max_flow),
-                            'num_paths': len(flow_path_details),
-                            'flow_paths': flow_path_details
+                            'max_flow': max_flow,
+                            'num_paths': len(flow_paths),
+                            'flow_paths': flow_paths
                         }
                     })
-                
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Coordenadas no válidas para origen o destino'
-                })
-            except (ValueError, TypeError) as e:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'Error al procesar coordenadas: {str(e)}'
-                })
-        else:
-            result = CALCULATOR.calculate_route(origin, destination, algorithm, criterion)
-            if not result or len(result) != 3:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Error al calcular la ruta'
-                })
-                
-            path, distance, time = result
-            
-            if not path:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'No se encontró una ruta válida'
-                })
-            
-            # Crear mapa con la ruta
-            m = create_base_map()
-            
-            try:
-                # Verificar y obtener coordenadas
-                points = []
-                valid_path = True
-                
-                for city in [origin, destination] + path:
-                    city_str = str(city)
-                    city_coords = COORDS_DATA.get(city_str, {})
-                    
-                    lat = float(city_coords.get('lat', 0))
-                    lon = float(city_coords.get('lon', 0))
-                    
-                    if lat != 0 and lon != 0:
-                        if city == origin:
-                            folium.Marker(
-                                location=[lat, lon],
-                                popup=f'Origen: {city}',
-                                icon=folium.Icon(color='green')
-                            ).add_to(m)
-                        elif city == destination:
-                            folium.Marker(
-                                location=[lat, lon],
-                                popup=f'Destino: {city}',
-                                icon=folium.Icon(color='red')
-                            ).add_to(m)
+                except Exception as e:
+                    print(f"Error al calcular el flujo máximo con {algorithm}: {str(e)}")
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Error al calcular el flujo máximo con {algorithm}: {str(e)}'
+                    }), 500
+            else:
+                print(f"Calculando ruta más corta con {algorithm}...")  # Debug log
+                try:
+                    result = CALCULATOR.calculate_shortest_path(origin, destination, algorithm, criterion)
+                    if result is None:
+                        return jsonify({
+                            'status': 'error',
+                            'message': 'No se pudo calcular la ruta'
+                        }), 500
                         
-                        points.append([lat, lon])
-                    else:
-                        valid_path = False
-                        break
-                
-                if valid_path and points:
-                    # Dibujar la ruta
-                    folium.PolyLine(
-                        locations=points,
-                        weight=3,
-                        color='blue',
-                        popup=f'Distancia: {float(distance):.2f} km, Tiempo: {int(time)} min'
-                    ).add_to(m)
+                    path, distance, time = result
+                    
+                    # Preparar datos para el frontend
+                    route_data = {
+                        'type': 'path',
+                        'path': path,
+                        'coords': COORDS_DATA
+                    }
                     
                     return jsonify({
                         'status': 'success',
-                        'map': m._repr_html_(),
+                        'route_data': route_data,
                         'details': {
-                            'distance': float(distance),
-                            'time': int(time),
-                            'path': ' → '.join(str(city) for city in path)
+                            'path': ' → '.join(path),
+                            'distance': distance,
+                            'time': time
                         }
                     })
-                
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Coordenadas no válidas para algunas ciudades en la ruta'
-                })
-            except (ValueError, TypeError) as e:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'Error al procesar coordenadas: {str(e)}'
-                })
-            
+                except Exception as e:
+                    print(f"Error al calcular la ruta con {algorithm}: {str(e)}")
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Error al calcular la ruta con {algorithm}: {str(e)}'
+                    }), 500
+
+        except Exception as e:
+            print(f"Error al calcular la ruta: {str(e)}")  # Debug log
+            import traceback
+            traceback.print_exc()  # Imprimir stack trace completo
+            return jsonify({
+                'status': 'error',
+                'message': f'Error al calcular la ruta: {str(e)}'
+            }), 500
+
     except Exception as e:
+        print(f"Error al procesar la solicitud: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()  # Imprimir stack trace completo
         return jsonify({
             'status': 'error',
-            'message': str(e)
-        })
+            'message': f'Error al procesar la solicitud: {str(e)}'
+        }), 400
 
 @app.route('/logout', methods=['POST'])
 def logout() -> ResponseReturnValue:
     """Cierra la sesión actual y limpia los datos cargados."""
     global CALCULATOR
     
-    # Limpiar variables globales
+    
     CALCULATOR = None
     
-    # Limpiar la sesión
+ 
     session.clear()
-    
-    # Eliminar archivo CSV si existe
+
     if 'graph_file' in session:
         try:
             file_path = session['graph_file']

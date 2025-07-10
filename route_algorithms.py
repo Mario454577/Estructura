@@ -1,292 +1,528 @@
 import networkx as nx
 from collections import deque
 import heapq
-from typing import Dict, List, Tuple, Optional, Any, Union, TypeVar, Generic
+from typing import Dict, List, Set, Tuple, Optional, Any, Union, TypeVar, Generic, TypedDict, cast, Mapping
+import math
+from collections import defaultdict
 
 T = TypeVar('T')
 
 class Matrix(Generic[T]):
     def __init__(self, rows: int, cols: int, default_value: T):
-        self.data: List[List[T]] = [[default_value for _ in range(cols)] for _ in range(rows)]
         self.rows = rows
         self.cols = cols
-
+        self.data = [[default_value for _ in range(cols)] for _ in range(rows)]
+    
     def __getitem__(self, key: Tuple[int, int]) -> T:
         i, j = key
-        return self.data[i][j]
-
+        if 0 <= i < self.rows and 0 <= j < self.cols:
+            return self.data[i][j]
+        raise IndexError("Matrix index out of range")
+    
     def __setitem__(self, key: Tuple[int, int], value: T) -> None:
         i, j = key
-        self.data[i][j] = value
+        if 0 <= i < self.rows and 0 <= j < self.cols:
+            self.data[i][j] = value
+        else:
+            raise IndexError("Matrix index out of range")
+
+class FlowPath(TypedDict):
+    path: List[str]
+    flow: float
+
+class Graph:
+    def __init__(self):
+        self.graph: Dict[str, List[Tuple[str, float, float]]] = defaultdict(list)
+        self.vertices: Set[str] = set()
+        
+    def add_edge(self, u: str, v: str, weight: float, time: float) -> None:
+        """Añade una arista al grafo con peso (distancia) y tiempo"""
+        self.graph[u].append((v, weight, time))
+        self.vertices.add(u)
+        self.vertices.add(v)
+
+    def get_vertices(self) -> Set[str]:
+        """Retorna el conjunto de vértices del grafo"""
+        return self.vertices
 
 class RouteCalculator:
-    def __init__(self, graph_data: Dict[str, Dict[str, Dict[str, float]]]):
-        """
-        Inicializa el calculador de rutas con los datos del grafo
-        graph_data: diccionario con formato {origen: {destino: {'distancia': float, 'tiempo': int}}}
-        """
-        self.graph = graph_data
-        self.flow_graph: Dict[str, Dict[str, float]] = {}
-        self.FLOW_CAPACITY = 150.0
+    def __init__(self, graph: Graph):
+        self.graph = graph
 
-    def dijkstra(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[Optional[List[str]], float]:
-        """Implementación mejorada de Dijkstra"""
-        if start not in self.graph or end not in self.graph:
-            return None, float('inf')
+    def calculate_shortest_path(self, start: str, end: str, algorithm: str = 'dijkstra', criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """
+        Calcula la ruta más corta usando el algoritmo especificado
+        """
+        if algorithm == 'dijkstra':
+            return self._dijkstra(start, end, criterion)
+        elif algorithm == 'bellman_ford':
+            return self._bellman_ford(start, end, criterion)
+        elif algorithm == 'floyd_warshall':
+            return self._floyd_warshall(start, end, criterion)
+        elif algorithm == 'a_star':
+            return self._a_star(start, end, criterion)
+        elif algorithm == 'johnson':
+            return self._johnson(start, end, criterion)
+        else:
+            raise ValueError(f"Algoritmo no soportado: {algorithm}")
 
-        dist: Dict[str, float] = {node: float('inf') for node in self.graph}
-        prev: Dict[str, Optional[str]] = {node: None for node in self.graph}
-        dist[start] = 0
-        
+    def calculate_max_flow(self, source: str, sink: str, algorithm: str = 'edmonds_karp') -> Tuple[float, List[FlowPath]]:
+        """Calcula el flujo máximo entre dos puntos usando el algoritmo especificado."""
+        if algorithm == 'ford_fulkerson':
+            return self._ford_fulkerson(source, sink)
+        elif algorithm == 'edmonds_karp':
+            return self._edmonds_karp(source, sink)
+        elif algorithm == 'push_relabel':
+            return self._push_relabel(source, sink)
+        else:
+            raise ValueError(f'Algoritmo de flujo máximo no válido: {algorithm}')
+
+    def _dijkstra(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """Implementación del algoritmo de Dijkstra"""
+        distances: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        times: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        distances[start] = 0
+        times[start] = 0
         pq: List[Tuple[float, str]] = [(0, start)]
-        
+        previous: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+
         while pq:
-            current_dist, current = heapq.heappop(pq)
-            
-            if current == end:
+            current_distance, current_vertex = heapq.heappop(pq)
+
+            if current_vertex == end:
                 break
-                
-            if current_dist > dist[current]:
+
+            if current_distance > distances[current_vertex]:
                 continue
+
+            for neighbor, weight, time in self.graph.graph[current_vertex]:
+                distance = distances[current_vertex] + weight
+                time_taken = times[current_vertex] + time
                 
-            for neighbor, attrs in self.graph[current].items():
-                weight = attrs[criterion]
-                distance = current_dist + weight
-                
-                if distance < dist[neighbor]:
-                    dist[neighbor] = distance
-                    prev[neighbor] = current
+                if criterion == 'distancia' and distance < distances[neighbor]:
+                    distances[neighbor] = distance
+                    times[neighbor] = time_taken
+                    previous[neighbor] = current_vertex
                     heapq.heappush(pq, (distance, neighbor))
-        
-        # Reconstruir ruta
-        if dist[end] == float('inf'):
-            return None, float('inf')
-            
+                elif criterion == 'tiempo' and time_taken < times[neighbor]:
+                    distances[neighbor] = distance
+                    times[neighbor] = time_taken
+                    previous[neighbor] = current_vertex
+                    heapq.heappush(pq, (time_taken, neighbor))
+
         path: List[str] = []
         current = end
         while current is not None:
             path.append(current)
-            current = prev[current]
+            current = previous[current]
         path.reverse()
-        
-        return path, dist[end]
 
-    def bellman_ford(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[Optional[List[str]], float]:
-        """Implementación mejorada de Bellman-Ford"""
-        if start not in self.graph or end not in self.graph:
-            return None, float('inf')
+        return path, distances[end], times[end]
 
-        dist: Dict[str, float] = {node: float('inf') for node in self.graph}
-        prev: Dict[str, Optional[str]] = {node: None for node in self.graph}
-        dist[start] = 0
-        
-        # Relajación de aristas
-        for _ in range(len(self.graph) - 1):
-            for u in self.graph:
-                for v, attrs in self.graph[u].items():
-                    weight = attrs[criterion]
-                    if dist[u] + weight < dist[v]:
-                        dist[v] = dist[u] + weight
-                        prev[v] = u
-        
-        # Detección de ciclos negativos
-        for u in self.graph:
-            for v, attrs in self.graph[u].items():
-                weight = attrs[criterion]
-                if dist[u] + weight < dist[v]:
-                    raise ValueError("El grafo contiene un ciclo de peso negativo")
-        
-        # Reconstruir ruta
-        if dist[end] == float('inf'):
-            return None, float('inf')
-            
+    def _bellman_ford(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """Implementación del algoritmo Bellman-Ford"""
+        distances: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        times: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        distances[start] = 0
+        times[start] = 0
+        previous: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+
+        for _ in range(len(self.graph.vertices) - 1):
+            for u in self.graph.vertices:
+                for v, weight, time in self.graph.graph[u]:
+                    if criterion == 'distancia':
+                        if distances[u] + weight < distances[v]:
+                            distances[v] = distances[u] + weight
+                            times[v] = times[u] + time
+                            previous[v] = u
+                    else:  # criterion == 'tiempo'
+                        if times[u] + time < times[v]:
+                            distances[v] = distances[u] + weight
+                            times[v] = times[u] + time
+                            previous[v] = u
+
+        for u in self.graph.vertices:
+            for v, weight, time in self.graph.graph[u]:
+                if criterion == 'distancia':
+                    if distances[u] + weight < distances[v]:
+                        raise ValueError("El grafo contiene un ciclo negativo")
+                else:
+                    if times[u] + time < times[v]:
+                        raise ValueError("El grafo contiene un ciclo negativo")
+
         path: List[str] = []
         current = end
         while current is not None:
             path.append(current)
-            current = prev[current]
+            current = previous[current]
         path.reverse()
-        
-        return path, dist[end]
 
-    def floyd_warshall(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[Optional[List[str]], float]:
-        """Implementación de Floyd-Warshall usando una clase Matrix personalizada"""
-        if start not in self.graph or end not in self.graph:
-            return None, float('inf')
+        return path, distances[end], times[end]
 
-        # Crear diccionario de índices
-        nodes = list(self.graph.keys())
-        node_to_idx = {node: i for i, node in enumerate(nodes)}
-        n = len(nodes)
+    def _floyd_warshall(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """Implementación del algoritmo Floyd-Warshall"""
+        vertices = list(self.graph.vertices)
+        n = len(vertices)
+        vertex_to_index = {vertex: i for i, vertex in enumerate(vertices)}
         
-        # Inicializar matrices usando la clase Matrix
-        dist = Matrix[float](n, n, float('inf'))
-        next_node = Matrix[Optional[int]](n, n, None)
-        
-        # Configurar distancias iniciales
+
+        dist_matrix: List[List[float]] = [[float('infinity')] * n for _ in range(n)]
+        time_matrix: List[List[float]] = [[float('infinity')] * n for _ in range(n)]
+        next_vertex: List[List[Optional[int]]] = [[None] * n for _ in range(n)]
+
         for i in range(n):
-            dist[(i, i)] = 0.0
-            
-        for u in self.graph:
-            for v, attrs in self.graph[u].items():
-                i, j = node_to_idx[u], node_to_idx[v]
-                dist[(i, j)] = float(attrs[criterion])
-                next_node[(i, j)] = j
-        
-        # Algoritmo principal
+            dist_matrix[i][i] = 0.0
+            time_matrix[i][i] = 0.0
+            next_vertex[i][i] = i
+
+        for u in self.graph.vertices:
+            for v, weight, time in self.graph.graph[u]:
+                i, j = vertex_to_index[u], vertex_to_index[v]
+                dist_matrix[i][j] = float(weight)
+                time_matrix[i][j] = float(time)
+                next_vertex[i][j] = j
+
         for k in range(n):
             for i in range(n):
                 for j in range(n):
-                    if dist[(i, k)] + dist[(k, j)] < dist[(i, j)]:
-                        dist[(i, j)] = dist[(i, k)] + dist[(k, j)]
-                        next_node[(i, j)] = next_node[(i, k)]
+                    if criterion == 'distancia':
+                        if dist_matrix[i][k] + dist_matrix[k][j] < dist_matrix[i][j]:
+                            dist_matrix[i][j] = dist_matrix[i][k] + dist_matrix[k][j]
+                            time_matrix[i][j] = time_matrix[i][k] + time_matrix[k][j]
+                            next_vertex[i][j] = next_vertex[i][k]
+                    else: 
+                        if time_matrix[i][k] + time_matrix[k][j] < time_matrix[i][j]:
+                            dist_matrix[i][j] = dist_matrix[i][k] + dist_matrix[k][j]
+                            time_matrix[i][j] = time_matrix[i][k] + time_matrix[k][j]
+                            next_vertex[i][j] = next_vertex[i][k]
+
+        start_idx = vertex_to_index[start]
+        end_idx = vertex_to_index[end]
         
-        # Reconstruir ruta
-        start_idx = node_to_idx[start]
-        end_idx = node_to_idx[end]
-        
-        if dist[(start_idx, end_idx)] == float('inf'):
-            return None, float('inf')
-            
-        path: List[str] = []
+        if next_vertex[start_idx][end_idx] is None:
+            return [], float('infinity'), float('infinity')
+
+        path: List[str] = [start]
         current = start_idx
-        
         while current != end_idx:
-            next_idx = next_node[(current, end_idx)]
+            next_idx = next_vertex[current][end_idx]
             if next_idx is None:
-                return None, float('inf')
-            path.append(nodes[current])
+                return [], float('infinity'), float('infinity')
             current = next_idx
-        path.append(nodes[end_idx])
-        
-        return path, dist[(start_idx, end_idx)]
+            path.append(vertices[current])
 
-    def build_flow_graph(self, start: str, end: str) -> Dict[str, Dict[str, float]]:
-        """
-        Construye un grafo de flujo dirigido basado en el origen y destino seleccionados.
-        Los arcos se redirigen para favorecer el flujo desde el origen hasta el destino.
-        """
-        self.flow_graph = {}
-        
-        # Primero, crear todas las aristas con capacidad estándar
-        for u in self.graph:
-            if u not in self.flow_graph:
-                self.flow_graph[u] = {}
-            for v in self.graph[u]:
-                if v not in self.flow_graph:
-                    self.flow_graph[v] = {}
-                # Inicialmente todas las aristas son bidireccionales
-                self.flow_graph[u][v] = float(self.FLOW_CAPACITY)
-                self.flow_graph[v][u] = float(self.FLOW_CAPACITY)
-        
-        # Usar Dijkstra para encontrar el camino más corto
-        path, _ = self.dijkstra(start, end)
-        
-        if path:
-            # Favorecer las aristas en el camino más corto
-            for i in range(len(path)-1):
-                u, v = path[i], path[i+1]
-                # Aumentar capacidad en la dirección del flujo
-                self.flow_graph[u][v] = float(self.FLOW_CAPACITY * 2)
-                # Reducir capacidad en la dirección opuesta
-                self.flow_graph[v][u] = float(self.FLOW_CAPACITY / 2)
-        
-        return self.flow_graph
+        return path, dist_matrix[start_idx][end_idx], time_matrix[start_idx][end_idx]
 
-    def edmonds_karp(self, start: str, end: str) -> Tuple[List[Tuple[List[str], float]], float]:
-        """
-        Implementación mejorada de Edmonds-Karp con visualización de flujo
-        """
-        if not self.flow_graph:
-            self.build_flow_graph(start, end)
-            
-        if start not in self.flow_graph or end not in self.flow_graph:
-            return [], 0.0
-            
-        def bfs() -> Optional[Dict[str, Optional[str]]]:
-            visited: Dict[str, bool] = {node: False for node in self.flow_graph}
-            parent: Dict[str, Optional[str]] = {node: None for node in self.flow_graph}
-            visited[start] = True
-            queue: deque = deque([start])
-            
-            while queue and not visited[end]:
-                u = queue.popleft()
-                for v, capacity in self.flow_graph[u].items():
-                    if not visited[v] and capacity > 0:
-                        visited[v] = True
-                        parent[v] = u
-                        queue.append(v)
-            
-            return parent if visited[end] else None
+    def _a_star(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """Implementación del algoritmo A*"""
+        def heuristic(node1: str, node2: str) -> float:
+            # Heurística simple basada en la distancia directa entre nodos
+            return 0  # Podríamos mejorar esto con coordenadas reales
+
+        open_set: Set[str] = {start}
+        closed_set: Set[str] = set()
         
-        max_flow = 0.0
-        flow_paths: List[Tuple[List[str], float]] = []
+        g_score: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        g_score[start] = 0
         
-        while True:
-            parent = bfs()
-            if not parent:
-                break
+        f_score: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        f_score[start] = heuristic(start, end)
+        
+        came_from: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+        times: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        times[start] = 0
+
+        while open_set:
+            current = min(open_set, key=lambda x: f_score[x])
+            
+            if current == end:
+                path: List[str] = []
+                while current is not None:
+                    path.append(current)
+                    current = came_from[current]
+                path.reverse()
+                return path, g_score[end], times[end]
+
+            open_set.remove(current)
+            closed_set.add(current)
+
+            for neighbor, weight, time in self.graph.graph[current]:
+                if neighbor in closed_set:
+                    continue
+
+                tentative_g_score = g_score[current] + (weight if criterion == 'distancia' else time)
                 
-            path_flow = float('inf')
-            path: List[str] = []
-            v = end
-            
-            while v != start:
-                u = parent[v]
-                if u is not None:  # Verificación de tipo
-                    path_flow = min(path_flow, self.flow_graph[u][v])
-                    path.append(v)
-                    v = u
-            path.append(start)
-            path.reverse()
-            
-            flow_paths.append((path, path_flow))
-            max_flow += path_flow
-            
-            v = end
-            while v != start:
-                u = parent[v]
-                if u is not None:  # Verificación de tipo
-                    self.flow_graph[u][v] -= path_flow
-                    self.flow_graph[v][u] += path_flow
-                    v = u
-        
-        return flow_paths, max_flow
+                if neighbor not in open_set:
+                    open_set.add(neighbor)
+                elif tentative_g_score >= g_score[neighbor]:
+                    continue
 
-    def calculate_route(self, start: str, end: str, algorithm: str, criterion: str = 'distancia') -> Tuple[Union[List[str], List[Tuple[List[str], float]]], float, Optional[float]]:
-        """
-        Calcula la ruta usando el algoritmo especificado
-        Retorna: (ruta/rutas_flujo, distancia/flujo, tiempo si aplica)
-        """
-        if algorithm == 'edmonds_karp':
-            flow_paths, max_flow = self.edmonds_karp(start, end)
-            return flow_paths, max_flow, None
-            
-        path: Optional[List[str]] = None
-        distance: float = float('inf')
-        
-        if algorithm == 'dijkstra':
-            path, distance = self.dijkstra(start, end, criterion)
-        elif algorithm == 'bellman_ford':
-            path, distance = self.bellman_ford(start, end, criterion)
-        elif algorithm == 'floyd_warshall':
-            path, distance = self.floyd_warshall(start, end, criterion)
-        else:
-            raise ValueError(f"Algoritmo no soportado: {algorithm}")
-            
-        if path is None:
-            return [], float('inf'), None
-            
-        time = self.get_route_time(path)
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                times[neighbor] = times[current] + time
+                f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, end)
+
+        return [], float('infinity'), float('infinity')
+
+    def _johnson(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
+        """Implementación del algoritmo de Johnson"""
+        # Añadir un nuevo vértice q y conectarlo a todos los demás con peso 0
+        q = "q_temp"
+        original_vertices = self.graph.vertices.copy()
+        self.graph.vertices.add(q)
+        for v in original_vertices:
+            self.graph.graph[q].append((v, 0, 0))
+
+        # Ejecutar Bellman-Ford desde q para obtener los potenciales h(v)
+        h: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
+        h[q] = 0
+
+        # Relajación de aristas
+        for _ in range(len(self.graph.vertices) - 1):
+            for u in self.graph.vertices:
+                for v, weight, _ in self.graph.graph[u]:
+                    if h[u] + weight < h[v]:
+                        h[v] = h[u] + weight
+
+        # Verificar ciclos negativos
+        for u in self.graph.vertices:
+            for v, weight, _ in self.graph.graph[u]:
+                if h[u] + weight < h[v]:
+                    raise ValueError("El grafo contiene un ciclo negativo")
+
+        # Eliminar el vértice q
+        self.graph.vertices.remove(q)
+        del self.graph.graph[q]
+
+        # Recalcular pesos usando los potenciales
+        reweighted_graph = Graph()
+        for u in original_vertices:
+            for v, weight, time in self.graph.graph[u]:
+                new_weight = weight + h[u] - h[v]
+                reweighted_graph.add_edge(u, v, new_weight, time)
+
+        # Ejecutar Dijkstra con los nuevos pesos
+        temp_calculator = RouteCalculator(reweighted_graph)
+        path, distance, time = temp_calculator._dijkstra(start, end, criterion)
+
+        # Ajustar la distancia final
+        if criterion == 'distancia':
+            distance = distance - h[start] + h[end]
+
         return path, distance, time
 
-    def get_route_time(self, path: List[str]) -> float:
-        """Calcula el tiempo total de una ruta"""
-        if not path or len(path) < 2:
-            return 0.0
+    def _ford_fulkerson(self, source: str, sink: str) -> Tuple[float, List[FlowPath]]:
+        """Implementación del algoritmo Ford-Fulkerson"""
+        def find_path(residual_graph: Dict[str, Dict[str, float]], source: str, sink: str) -> Tuple[bool, Dict[str, Optional[str]]]:
+            visited: Set[str] = set()
+            queue: deque[str] = deque([source])
+            parent: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+            visited.add(source)
+
+            while queue and sink not in visited:
+                u = queue.popleft()
+                for v in residual_graph[u]:
+                    if v not in visited and residual_graph[u][v] > 0:
+                        queue.append(v)
+                        visited.add(v)
+                        parent[v] = u
+
+            return sink in visited, parent
+
+        # Inicializar grafo residual
+        residual_graph: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for u in self.graph.vertices:
+            for v, weight, _ in self.graph.graph[u]:
+                residual_graph[u][v] = float(weight)
+
+        max_flow = 0
+        flow_paths: List[FlowPath] = []
+
+        while True:
+            path_exists, parent = find_path(residual_graph, source, sink)
+            if not path_exists:
+                break
+
+            path_flow = float('infinity')
+            s = sink
+            path: List[str] = []
+            while s != source:
+                path.append(s)
+                p = parent[s]
+                if p is not None:
+                    path_flow = min(path_flow, residual_graph[p][s])
+                s = p if p is not None else source
+            path.append(source)
+            path.reverse()
+
+            s = sink
+            while s != source:
+                p = parent[s]
+                if p is not None:
+                    residual_graph[p][s] -= path_flow
+                    residual_graph[s][p] += path_flow
+                s = p if p is not None else source
+
+            max_flow += path_flow
+            flow_paths.append({"path": path, "flow": path_flow})
+
+        return max_flow, flow_paths
+
+    def _edmonds_karp(self, source: str, sink: str) -> Tuple[float, List[FlowPath]]:
+        """Implementación del algoritmo de Edmonds-Karp"""
+        def bfs(residual_graph: Dict[str, Dict[str, float]], source: str, sink: str) -> Tuple[bool, Dict[str, Optional[str]]]:
+            visited: Set[str] = set()
+            queue: deque[str] = deque([source])
+            parent: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+            visited.add(source)
+
+            while queue and sink not in visited:
+                u = queue.popleft()
+                for v in residual_graph[u]:
+                    if v not in visited and residual_graph[u][v] > 0:
+                        queue.append(v)
+                        visited.add(v)
+                        parent[v] = u
+
+            return sink in visited, parent
+
+        # Inicializar grafo residual
+        residual_graph: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for u in self.graph.vertices:
+            for v, weight, _ in self.graph.graph[u]:
+                residual_graph[u][v] = float(weight)
+
+        max_flow = 0
+        flow_paths: List[FlowPath] = []
+
+        while True:
+            path_exists, parent = bfs(residual_graph, source, sink)
+            if not path_exists:
+                break
+
+            path_flow = float('infinity')
+            s = sink
+            path: List[str] = []
+            while s != source:
+                path.append(s)
+                p = parent[s]
+                if p is not None:
+                    path_flow = min(path_flow, residual_graph[p][s])
+                s = p if p is not None else source
+            path.append(source)
+            path.reverse()
+
+            s = sink
+            while s != source:
+                p = parent[s]
+                if p is not None:
+                    residual_graph[p][s] -= path_flow
+                    residual_graph[s][p] += path_flow
+                s = p if p is not None else source
+
+            max_flow += path_flow
+            flow_paths.append({"path": path, "flow": path_flow})
+
+        return max_flow, flow_paths
+
+    def _push_relabel(self, source: str, sink: str) -> Tuple[float, List[FlowPath]]:
+        """Implementación del algoritmo Push-Relabel"""
+        def initialize_preflow() -> Tuple[Dict[str, int], Dict[str, float], Dict[str, Dict[str, float]]]:
+            height: Dict[str, int] = {vertex: 0 for vertex in self.graph.vertices}
+            height[source] = len(self.graph.vertices)
             
-        total_time = 0.0
-        for i in range(len(path)-1):
-            u, v = path[i], path[i+1]
-            total_time += float(self.graph[u][v]['tiempo'])
-        return total_time 
+            excess: Dict[str, float] = {vertex: 0.0 for vertex in self.graph.vertices}
+            
+            flow: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+            
+            # Inicializar el flujo desde la fuente
+            for v, weight, _ in self.graph.graph[source]:
+                flow[source][v] = float(weight)
+                flow[v][source] = -float(weight)
+                excess[v] = float(weight)
+                excess[source] -= float(weight)
+            
+            return height, excess, flow
+
+        def push(u: str, v: str, height: Dict[str, int], excess: Dict[str, float], 
+                flow: Dict[str, Dict[str, float]], capacity: Dict[str, Dict[str, float]]) -> bool:
+            if height[u] <= height[v]:
+                return False
+            
+            residual = capacity[u][v] - flow[u][v]
+            if residual <= 0 or excess[u] <= 0:
+                return False
+                
+            delta = min(excess[u], residual)
+            flow[u][v] += delta
+            flow[v][u] -= delta
+            excess[u] -= delta
+            excess[v] += delta
+            return True
+
+        def relabel(u: str, height: Dict[str, int], flow: Dict[str, Dict[str, float]], 
+                   capacity: Dict[str, Dict[str, float]]) -> bool:
+            if excess[u] <= 0:
+                return False
+                
+            min_height = float('infinity')
+            for v, weight, _ in self.graph.graph[u]:
+                if capacity[u][v] - flow[u][v] > 0:
+                    min_height = min(min_height, height[v])
+            
+            if min_height == float('infinity'):
+                return False
+                
+            height[u] = int(min_height + 1)  # Convertir a int
+            return True
+
+        # Inicializar capacidades
+        capacity: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for u in self.graph.vertices:
+            for v, weight, _ in self.graph.graph[u]:
+                capacity[u][v] = float(weight)
+
+        # Inicializar preflow
+        height, excess, flow = initialize_preflow()
+
+        # Proceso principal
+        vertices = list(self.graph.vertices - {source, sink})
+        i = 0
+        while i < len(vertices):
+            u = vertices[i]
+            old_excess = excess[u]
+            
+            for v, _, _ in self.graph.graph[u]:
+                if excess[u] > 0:
+                    push(u, v, height, excess, flow, capacity)
+            
+            if excess[u] == old_excess and excess[u] > 0:
+                relabel(u, height, flow, capacity)
+                i = 0
+            else:
+                i += 1
+
+        # Reconstruir las rutas de flujo
+        max_flow = sum(flow[source][v] for v, _, _ in self.graph.graph[source])
+        
+        # Encontrar las rutas de flujo
+        flow_paths: List[FlowPath] = []
+        visited: Set[str] = set()
+        
+        def find_path(u: str, current_path: List[str], current_flow: float) -> None:
+            if u == sink:
+                if current_flow > 0:
+                    flow_paths.append({"path": current_path.copy(), "flow": current_flow})
+                return
+            
+            visited.add(u)
+            for v, _, _ in self.graph.graph[u]:
+                if v not in visited and flow[u][v] > 0:
+                    current_path.append(v)
+                    find_path(v, current_path, min(current_flow, flow[u][v]))
+                    current_path.pop()
+            visited.remove(u)
+        
+        find_path(source, [source], float('infinity'))
+        
+        return max_flow, flow_paths 

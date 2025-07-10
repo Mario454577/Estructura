@@ -37,13 +37,36 @@ class Graph:
         
     def add_edge(self, u: str, v: str, weight: float, time: float) -> None:
         """Añade una arista al grafo con peso (distancia) y tiempo"""
-        self.graph[u].append((v, weight, time))
+        # Validar los datos de entrada
+        if not isinstance(weight, (int, float)) or not isinstance(time, (int, float)):
+            raise ValueError(f"Peso y tiempo deben ser números. Recibidos: peso={type(weight)}, tiempo={type(time)}")
+        
+        if weight < 0 or time < 0:
+            raise ValueError(f"Peso y tiempo deben ser positivos. Recibidos: peso={weight}, tiempo={time}")
+            
+        # Verificar si la conexión ya existe
+        exists = False
+        for i, (dest, w, t) in enumerate(self.graph[u]):
+            if dest == v:
+                exists = True
+                # Actualizar con el menor peso/tiempo si ya existe
+                if weight < w or (weight == w and time < t):
+                    self.graph[u][i] = (v, weight, time)
+                break
+        
+        if not exists:
+            self.graph[u].append((v, weight, time))
+            
         self.vertices.add(u)
         self.vertices.add(v)
-
+        
     def get_vertices(self) -> Set[str]:
         """Retorna el conjunto de vértices del grafo"""
         return self.vertices
+        
+    def get_neighbors(self, vertex: str) -> List[Tuple[str, float, float]]:
+        """Retorna la lista de vecinos de un vértice con sus pesos y tiempos"""
+        return self.graph.get(vertex, [])
 
 class RouteCalculator:
     def __init__(self, graph: Graph):
@@ -79,43 +102,62 @@ class RouteCalculator:
 
     def _dijkstra(self, start: str, end: str, criterion: str = 'distancia') -> Tuple[List[str], float, float]:
         """Implementación del algoritmo de Dijkstra"""
+        # Inicializar estructuras de datos
         distances: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
         times: Dict[str, float] = {vertex: float('infinity') for vertex in self.graph.vertices}
         distances[start] = 0
         times[start] = 0
         pq: List[Tuple[float, str]] = [(0, start)]
         previous: Dict[str, Optional[str]] = {vertex: None for vertex in self.graph.vertices}
+        visited = set()
 
         while pq:
-            current_distance, current_vertex = heapq.heappop(pq)
+            current_value, current_vertex = heapq.heappop(pq)
+            
+            if current_vertex in visited:
+                continue
+                
+            visited.add(current_vertex)
 
             if current_vertex == end:
                 break
 
-            if current_distance > distances[current_vertex]:
+            if current_vertex not in self.graph.graph:
                 continue
 
             for neighbor, weight, time in self.graph.graph[current_vertex]:
-                distance = distances[current_vertex] + weight
-                time_taken = times[current_vertex] + time
-                
-                if criterion == 'distancia' and distance < distances[neighbor]:
-                    distances[neighbor] = distance
-                    times[neighbor] = time_taken
-                    previous[neighbor] = current_vertex
-                    heapq.heappush(pq, (distance, neighbor))
-                elif criterion == 'tiempo' and time_taken < times[neighbor]:
-                    distances[neighbor] = distance
-                    times[neighbor] = time_taken
-                    previous[neighbor] = current_vertex
-                    heapq.heappush(pq, (time_taken, neighbor))
+                if neighbor in visited:
+                    continue
+                    
+                if criterion == 'distancia':
+                    new_distance = distances[current_vertex] + weight
+                    corresponding_time = times[current_vertex] + time
+                    
+                    if new_distance < distances[neighbor]:
+                        distances[neighbor] = new_distance
+                        times[neighbor] = corresponding_time
+                        previous[neighbor] = current_vertex
+                        heapq.heappush(pq, (new_distance, neighbor))
+                else:  # criterion == 'tiempo'
+                    new_time = times[current_vertex] + time
+                    corresponding_distance = distances[current_vertex] + weight
+                    
+                    if new_time < times[neighbor]:
+                        times[neighbor] = new_time
+                        distances[neighbor] = corresponding_distance
+                        previous[neighbor] = current_vertex
+                        heapq.heappush(pq, (new_time, neighbor))
 
+        # Reconstruir el camino
         path: List[str] = []
         current = end
         while current is not None:
             path.append(current)
             current = previous[current]
         path.reverse()
+
+        if not path or path[0] != start:
+            return [], float('infinity'), float('infinity')
 
         return path, distances[end], times[end]
 

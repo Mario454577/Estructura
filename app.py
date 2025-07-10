@@ -10,12 +10,12 @@ from werkzeug.utils import secure_filename
 from typing import Dict, List, Tuple, Optional, Any, Union
 from flask.typing import ResponseReturnValue
 import csv
-
+#Presentado por: Carlos, Mario y Valeria
 app = Flask(__name__)
 app.secret_key = '1111' 
 CORS(app)
 
-# Coordenadas de los municipios
+# Coordenadas de los municipios, exclusivo para el mapa del programa
 COORDS_DATA = {
     "Achi": {"lat": 8.60283045, "lon": -74.4586880450204},
     "Altos del Rosario": {"lat": 8.79139, "lon": -74.1636},
@@ -67,7 +67,7 @@ COORDS_DATA = {
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'csv'}
-CALCULATOR: Optional[RouteCalculator] = None  # Inicializar como None
+CALCULATOR: Optional[RouteCalculator] = None  # Se inicializa la calculadora como NONE
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -81,39 +81,64 @@ def load_graph_data(file_path: str) -> bool:
     """Carga los datos del grafo desde un archivo CSV."""
     global CALCULATOR  
     try:
-    
         graph = Graph()
+        
+        # Diccionario para almacenar todas las conexiones para verificación
+        connections = {}
         
         with open(file_path, 'r', encoding='utf-8') as file:
             reader = csv.reader(file, delimiter=';')
             headers = next(reader)
             
-      
             required_headers = ['Origen', 'Destino', 'Distancia', 'Duracion']
             if not all(header in headers for header in required_headers):
                 return False
             
-           
             origin_idx = headers.index('Origen')
             dest_idx = headers.index('Destino')
             dist_idx = headers.index('Distancia')
             time_idx = headers.index('Duracion')
             
-           
+            # Primera pasada: recolectar todas las conexiones
             for row in reader:
                 origin = row[origin_idx].strip()
                 destination = row[dest_idx].strip()
                 try:
-                    distance = float(row[dist_idx].strip())
-                    duration = float(row[time_idx].strip())
-                except ValueError:
+                    # Convertir valores con coma decimal a punto decimal, en caso de ser necesario
+                    distance = float(row[dist_idx].strip().replace(',', '.'))
+                    duration = float(row[time_idx].strip().replace(',', '.'))
+                    
+                 
+                    if origin not in connections:
+                        connections[origin] = set()
+                    if destination not in connections:
+                        connections[destination] = set()
+                    
+                    connections[origin].add(destination)
+                    connections[destination].add(origin)
+                    
+                    # Agregar la conexión al grafo en ambas direcciones
+                    graph.add_edge(origin, destination, distance, duration)
+                    graph.add_edge(destination, origin, distance, duration)
+                    
+                except ValueError as e:
                     continue
-                
-            
-                graph.add_edge(origin, destination, distance, duration)
-                graph.add_edge(destination, origin, distance, duration)
         
+        # Verificar conectividad
+        def find_path(start, end, visited=None):
+            if visited is None:
+                visited = set()
+            if start == end:
+                return True
+            visited.add(start)
+            for next_node in connections.get(start, []):
+                if next_node not in visited and find_path(next_node, end, visited):
+                    return True
+            return False
+        
+        # Verificar que haya un camino entre Cartagena y todos los demás municipios
 
+        
         CALCULATOR = RouteCalculator(graph)
         return True
         
@@ -210,7 +235,7 @@ def get_municipalities():
 @app.route('/calculate_route', methods=['POST'])
 def calculate_route() -> ResponseReturnValue:
     """Calcula la ruta entre dos puntos usando el algoritmo especificado."""
-    print("Iniciando cálculo de ruta...")  # Debug log
+    print("\n=== Iniciando cálculo de ruta ===")  # Debug log
     
     if not CALCULATOR:
         print("Error: No hay calculadora inicializada")  # Debug log
@@ -220,29 +245,50 @@ def calculate_route() -> ResponseReturnValue:
         }), 400
 
     try:
-        print("Content-Type:", request.headers.get('Content-Type'))  # Debug log
-        print("Datos raw:", request.get_data())  # Debug log
+  
+        content_type = request.headers.get('Content-Type', '')
+        print(f"Content-Type recibido: {content_type}")  # Debug log
         
-        data = request.get_json(force=True)
-        print("Datos parseados:", data)  # Debug log
-        
-        if not data:
-            print("Error: No hay datos en la solicitud")  # Debug log
+        if not content_type.startswith('application/json'):
+            print(f"Error: Content-Type incorrecto: {content_type}")  # Debug log
             return jsonify({
                 'status': 'error',
-                'message': 'No se recibieron datos en la solicitud'
+                'message': 'El Content-Type debe ser application/json'
             }), 400
 
-        print(f"Datos recibidos: {data}")  # Debug log
+        
+        try:
+            raw_data = request.get_data(as_text=True)
+            print(f"Datos raw recibidos: {raw_data}")  # Debug log
+            
+            data = request.get_json(force=True)
+            print(f"Datos JSON parseados: {data}")  # Debug log
+        except Exception as e:
+            print(f"Error al parsear JSON: {str(e)}")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': f'Error al parsear JSON: {str(e)}'
+            }), 400
 
-        origin = data.get('origin')
-        destination = data.get('destination')
-        algorithm = data.get('algorithm')
-        criterion = data.get('criterion', 'distancia')
+        if not isinstance(data, dict):
+            print(f"Error: datos no son un diccionario: {type(data)}")  # Debug log
+            return jsonify({
+                'status': 'error',
+                'message': 'Formato de datos inválido'
+            }), 400
 
-        print(f"Origen: {origin}, Destino: {destination}, Algoritmo: {algorithm}, Criterio: {criterion}")  # Debug log
+        origin = str(data.get('origin', '')).strip()
+        destination = str(data.get('destination', '')).strip()
+        algorithm = str(data.get('algorithm', '')).strip()
+        criterion = str(data.get('criterion', 'distancia')).strip()
 
-        # Validar datos requeridos
+        print(f"Datos procesados:")  # Debug log
+        print(f"- Origen: '{origin}'")
+        print(f"- Destino: '{destination}'")
+        print(f"- Algoritmo: '{algorithm}'")
+        print(f"- Criterio: '{criterion}'")
+
+       
         if not origin or not destination or not algorithm:
             missing = []
             if not origin: missing.append('origen')
@@ -254,36 +300,37 @@ def calculate_route() -> ResponseReturnValue:
                 'message': f'Faltan datos requeridos: {", ".join(missing)}'
             }), 400
 
-        # Validar que los municipios existan
+       
         if origin not in COORDS_DATA:
-            print(f"Error: Municipio de origen no encontrado: {origin}")  # Debug log
+            print(f"Error: Municipio de origen no encontrado: '{origin}'")  # Debug log
             return jsonify({
                 'status': 'error',
                 'message': f'Municipio de origen "{origin}" no encontrado'
             }), 404
             
         if destination not in COORDS_DATA:
-            print(f"Error: Municipio de destino no encontrado: {destination}")  # Debug log
+            print(f"Error: Municipio de destino no encontrado: '{destination}'")  # Debug log
             return jsonify({
                 'status': 'error',
                 'message': f'Municipio de destino "{destination}" no encontrado'
             }), 404
 
         try:
-            # Validar algoritmo
+       
             valid_algorithms = ['dijkstra', 'bellman_ford', 'floyd_warshall', 'a_star', 'johnson',
                               'ford_fulkerson', 'edmonds_karp', 'push_relabel']
             if algorithm not in valid_algorithms:
-                print(f"Error: Algoritmo no válido: {algorithm}")  # Debug log
+                print(f"Error: Algoritmo no válido: '{algorithm}'")  # Debug log
                 return jsonify({
                     'status': 'error',
                     'message': f'Algoritmo "{algorithm}" no válido'
                 }), 400
 
-            # Calcular la ruta según el algoritmo seleccionado
+   
             if algorithm in ['edmonds_karp', 'push_relabel', 'ford_fulkerson']:
-                print(f"Calculando flujo máximo con {algorithm}...")  # Debug log
+                print(f"\nCalculando flujo máximo con {algorithm}...")  # Debug log
                 try:
+                    result = None
                     if algorithm == 'ford_fulkerson':
                         result = CALCULATOR._ford_fulkerson(origin, destination)
                     elif algorithm == 'edmonds_karp':
@@ -299,6 +346,8 @@ def calculate_route() -> ResponseReturnValue:
                         }), 500
                         
                     max_flow, flow_paths = result
+                    print(f"Flujo máximo calculado: {max_flow}")  # Debug log
+                    print(f"Número de rutas: {len(flow_paths)}")  # Debug log
                     
                     # Preparar datos para el frontend
                     route_data = {
@@ -307,32 +356,43 @@ def calculate_route() -> ResponseReturnValue:
                         'coords': COORDS_DATA
                     }
                     
-                    return jsonify({
+                    response_data = {
                         'status': 'success',
                         'route_data': route_data,
                         'details': {
-                            'max_flow': max_flow,
+                            'max_flow': float(max_flow),  # Asegurar que sea JSON serializable
                             'num_paths': len(flow_paths),
                             'flow_paths': flow_paths
                         }
-                    })
+                    }
+                    
+                    print("\nEnviando respuesta:")  # Debug log
+                    print(response_data)
+                    
+                    return jsonify(response_data)
+                    
                 except Exception as e:
-                    print(f"Error al calcular el flujo máximo con {algorithm}: {str(e)}")
+                    print(f"Error al calcular el flujo máximo con {algorithm}: {str(e)}")  # Debug log
                     return jsonify({
                         'status': 'error',
                         'message': f'Error al calcular el flujo máximo con {algorithm}: {str(e)}'
                     }), 500
             else:
-                print(f"Calculando ruta más corta con {algorithm}...")  # Debug log
+                print(f"\nCalculando ruta más corta con {algorithm}...")  # Debug log
                 try:
                     result = CALCULATOR.calculate_shortest_path(origin, destination, algorithm, criterion)
                     if result is None:
+                        print("Error: No se pudo calcular la ruta")  
                         return jsonify({
                             'status': 'error',
                             'message': 'No se pudo calcular la ruta'
                         }), 500
                         
                     path, distance, time = result
+                    print(f"Ruta calculada:")  # Debug log
+                    print(f"- Camino: {path}")
+                    print(f"- Distancia: {distance}")
+                    print(f"- Tiempo: {time}")
                     
                     # Preparar datos para el frontend
                     route_data = {
@@ -341,17 +401,23 @@ def calculate_route() -> ResponseReturnValue:
                         'coords': COORDS_DATA
                     }
                     
-                    return jsonify({
+                    response_data = {
                         'status': 'success',
                         'route_data': route_data,
                         'details': {
                             'path': ' → '.join(path),
-                            'distance': distance,
-                            'time': time
+                            'distance': float(distance),  # Asegurar que sea JSON serializable
+                            'time': float(time)  # Asegurar que sea JSON serializable
                         }
-                    })
+                    }
+                    
+                    print("\nEnviando respuesta:")  # Debug log
+                    print(response_data)
+                    
+                    return jsonify(response_data)
+                    
                 except Exception as e:
-                    print(f"Error al calcular la ruta con {algorithm}: {str(e)}")
+                    print(f"Error al calcular la ruta con {algorithm}: {str(e)}")  # Debug log
                     return jsonify({
                         'status': 'error',
                         'message': f'Error al calcular la ruta con {algorithm}: {str(e)}'
@@ -374,7 +440,7 @@ def calculate_route() -> ResponseReturnValue:
             'status': 'error',
             'message': f'Error al procesar la solicitud: {str(e)}'
         }), 400
-
+#Cierre de sesion o reinicio del programa en este caso
 @app.route('/logout', methods=['POST'])
 def logout() -> ResponseReturnValue:
     """Cierra la sesión actual y limpia los datos cargados."""
